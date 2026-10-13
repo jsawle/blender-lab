@@ -1,0 +1,34 @@
+{
+  "earth_cutaway.glb": {
+    "version": "0.2.0",
+    "height_m": 12.742,
+    "width_m": 12.7281,
+    "depth_m": 12.7281,
+    "min_y_m": -6.371,
+    "bytes": 1648304
+  },
+  "pompeii_house.glb": {
+    "version": "0.2.0",
+    "height_m": 9.3,
+    "width_m": 20,
+    "depth_m": 40,
+    "min_y_m": -0.7,
+    "bytes": 484036
+  },
+  "pompeii_house_body.glb": {
+    "version": "0.2.0",
+    "height_m": 7.9,
+    "width_m": 20,
+    "depth_m": 40,
+    "min_y_m": -0.7,
+    "bytes": 465344
+  },
+  "pompeii_house_roofs.glb": {
+    "version": "0.2.0",
+    "height_m": 5.2,
+    "width_m": 14.6,
+    "depth_m": 30.75,
+    "min_y_m": 3.4,
+    "bytes": 24588
+  }
+}

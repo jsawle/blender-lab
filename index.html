@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blender Lab: Emissive Models in ArcGIS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script type="module" src="https://js.arcgis.com/5.1/"></script>
+<link rel="stylesheet" href="https://js.arcgis.com/5.1/esri/themes/light/main.css">
+<style>
+/* Layout: one working screen — scene left, controls right; stacks on phones. */
+:root {
+  --bg: #f2efea; --panel: #ffffff; --fg: #211b17; --muted: #625750; --line: #dcd2c8;
+  --accent: #9a2f1e;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #171413; --panel: #201c1a; --fg: #eee7e0; --muted: #aa9e94; --line: #3a3330; --accent: #ea7a5f; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--font-body); padding: 16px; }
+h1 { font-size: 1.35rem; margin: 0; text-wrap: balance; }
+h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 8px; }
+.wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; }
+header p { margin: 0; color: var(--muted); }
+.lab-tag { font-family: var(--font-data); font-size: 0.75rem; border: 1px solid var(--accent); color: var(--accent); padding: 1px 8px; border-radius: 3px; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; }
+@media (max-width: 880px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.stage { position: relative; border-radius: 6px; overflow: hidden; aspect-ratio: 16 / 10; min-height: 340px; background: #0b0c0f; }
+.view { position: absolute; inset: 0; }
+.status { position: absolute; left: 12px; top: 12px; z-index: 2; font: 0.8rem var(--font-data); color: #f6f1ea; background: rgba(25,20,18,0.8); padding: 4px 8px; border-radius: 3px; max-width: calc(100% - 24px); }
+aside { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; min-width: 0; }
+fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 4px; }
+legend { padding: 0; }
+.choice, .toggle { display: flex; align-items: center; gap: 10px; padding: 5px 2px; cursor: pointer; }
+.choice input, .toggle input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+.slider { display: grid; gap: 2px; margin-top: 10px; }
+.slider .row { display: flex; justify-content: space-between; gap: 8px; }
+.slider output { font-family: var(--font-data); font-variant-numeric: tabular-nums; color: var(--muted); }
+.slider input { width: 100%; accent-color: var(--accent); }
+[data-for] { }
+.note { color: var(--muted); font-size: 0.85rem; margin: 8px 0 0; }
+.tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+thead th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+td.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; white-space: nowrap; }
+input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.credit { position: fixed; right: 12px; bottom: 12px; z-index: 5; background: var(--panel); border: 1px solid var(--line); color: var(--muted); font-size: 0.75rem; padding: 4px 10px; border-radius: 4px; }
+footer { height: 36px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Emissive Blender models in ArcGIS</h1>
+    <span class="lab-tag">LAB</span>
+    <p>Testing light-emitting materials and glow (ArcGIS Maps SDK for JavaScript 5.1) on models built by Python scripts in Blender.</p>
+  </header>
+
+  <div class="main">
+    <div class="stage">
+      <div class="status" id="status" role="status" aria-live="polite">Loading scene…</div>
+      <div class="view" id="view-pompeii" role="region" aria-label="3D scene: a Pompeian house at night, lit by oil lamps and braziers"></div>
+      <div class="view" id="view-earth" role="region" aria-label="3D scene: cutaway of the Earth with a glowing outer and inner core" hidden></div>
+    </div>
+
+    <aside>
+      <div class="panel">
+        <fieldset id="scene-choice">
+          <legend><h2>Scene</h2></legend>
+          <label class="choice" for="s-pompeii"><input type="radio" name="scene" id="s-pompeii" value="pompeii" checked> Pompeii house at night</label>
+          <label class="choice" for="s-earth"><input type="radio" name="scene" id="s-earth" value="earth"> Earth's core</label>
+        </fieldset>
+      </div>
+
+      <div class="panel">
+        <h2>Light</h2>
+        <label class="toggle" for="glow-on"><input type="checkbox" id="glow-on" checked> Glow effect</label>
+        <div class="slider">
+          <div class="row"><label for="glow">Glow intensity</label><output id="glow-out" for="glow">0.50</output></div>
+          <input type="range" id="glow" min="0" max="1" step="0.05" value="0.5">
+        </div>
+        <div class="slider">
+          <div class="row"><label for="emit">Emissive strength</label><output id="emit-out" for="emit">1.0</output></div>
+          <input type="range" id="emit" min="0" max="4" step="0.1" value="1">
+        </div>
+        <div class="slider" data-for="pompeii" id="time-wrap">
+          <div class="row"><label for="time">Local time</label><output id="time-out" for="time">21:30</output></div>
+          <input type="range" id="time" min="12" max="24" step="0.25" value="21.5">
+        </div>
+        <label class="toggle" for="roofs" data-for="pompeii" id="roofs-wrap"><input type="checkbox" id="roofs" checked> Roofs</label>
+        <p class="note">Glow and emissive strength are the new SDK 5 settings. The flames, coals and core colours come from the Blender models themselves.</p>
+      </div>
+    </aside>
+  </div>
+
+  <div class="tables">
+    <section class="panel">
+      <h2>What to look for</h2>
+      <ul class="note" style="margin:0; padding-left:1.2em; display:grid; gap:6px">
+        <li>Do the lamp flames and brazier coals read at night from street level and from above?</li>
+        <li>Do emitters light nearby walls and floors, or only glow themselves?</li>
+        <li>Does the core glow cleanly through the cutaway without washing out the mantle?</li>
+        <li>Frame rate with glow on and off on a school Chromebook.</li>
+      </ul>
+      <p class="note">The house is a representative atrium house placed approximately in Regio VI, north-west of the Forum. It is not on a real plot.</p>
+    </section>
+    <section class="panel">
+      <h2>About and versions</h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr></thead>
+          <tbody id="versions">
+            <tr><td>Lab page</td><td class="num">0.1.0</td><td>ArcGIS Maps SDK for JavaScript 5.1</td></tr>
+            <tr><td>Earth cutaway model</td><td class="num" id="v-earth">—</td><td><code>blender/earth_cutaway.py</code></td></tr>
+            <tr><td>Pompeii house model</td><td class="num" id="v-house">—</td><td><code>blender/pompeii_house.py</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  <footer></footer>
+</div>
+
+<div class="credit">Created by Jason Sawle</div>
+
+<script type="module">
+const [Map, SceneView, Graphic, GraphicsLayer, Basemap, TileLayer, Point] = await $arcgis.import([
+  "@arcgis/core/Map.js", "@arcgis/core/views/SceneView.js", "@arcgis/core/Graphic.js",
+  "@arcgis/core/layers/GraphicsLayer.js", "@arcgis/core/Basemap.js",
+  "@arcgis/core/layers/TileLayer.js", "@arcgis/core/geometry/Point.js",
+]);
+
+const $ = id => document.getElementById(id);
+const status = msg => { $("status").textContent = msg; };
+window.addEventListener("unhandledrejection", e => status("Error: " + (e.reason?.message || e.reason)));
+
+const manifest = await fetch("./models/manifest.json").then(r => r.json());
+$("v-earth").textContent = manifest["earth_cutaway.glb"].version;
+$("v-house").textContent = manifest["pompeii_house_body.glb"].version;
+
+const state = { glowOn: true, glow: 0.5, emit: 1, hour: 21.5 };
+
+// Model symbol: the GLB at its true height, emissive taken from the model's own materials
+function modelSymbol(file, height = manifest[file].height_m) {
+  return {
+    type: "point-3d",
+    symbolLayers: [{
+      type: "object",
+      resource: { href: `./models/${file}` },
+      height,
+      anchor: "origin",
+      material: { emissive: { source: "emissive", strength: state.emit } },
+    }],
+  };
+}
+const glow = () => (state.glowOn ? { intensity: state.glow } : null);
+
+// ---------------------------------------------------------------- Pompeii
+const POMPEII = { longitude: 14.4836, latitude: 40.7505 };   // approximate, Regio VI
+const houseLayer = new GraphicsLayer({ elevationInfo: { mode: "relative-to-ground" } });
+const at = new Point({ ...POMPEII, z: 0 });
+const body = new Graphic({ geometry: at, symbol: modelSymbol("pompeii_house_body.glb") });
+const roofs = new Graphic({ geometry: at, symbol: modelSymbol("pompeii_house_roofs.glb") });
+houseLayer.addMany([body, roofs]);
+
+const imagery = new Basemap({
+  baseLayers: [new TileLayer({ url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer" })],
+});
+const pompeiiView = new SceneView({
+  container: "view-pompeii",
+  map: new Map({ basemap: imagery, ground: "world-elevation", layers: [houseLayer] }),
+  camera: { position: { longitude: 14.48322, latitude: 40.75003, z: 75 }, heading: 30, tilt: 68 },
+  qualityProfile: "high",
+  environment: { lighting: { type: "sun", date: dateFor(state.hour), displayUTCOffset: 2, directShadowsEnabled: true, glow: glow() } },
+});
+
+function dateFor(hour) {
+  // a late-October evening; Pompeii is UTC+2 in summer time
+  const h = Math.floor(hour), m = Math.round((hour - h) * 60);
+  return new Date(Date.UTC(2026, 9, 24, h - 2, m));
+}
+
+// ---------------------------------------------------------------- Earth
+let earthView = null;
+let earthGraphic = null;
+function makeEarth() {
+  const layer = new GraphicsLayer({ elevationInfo: { mode: "absolute-height" } });
+  earthGraphic = new Graphic({
+    geometry: new Point({ x: 0, y: 0, z: 0, spatialReference: { wkid: 3857 } }),
+    // the model is 12.742 units across; shown at 1 m : 1 km, so 12,742 m across
+    symbol: modelSymbol("earth_cutaway.glb", 12742),
+  });
+  layer.add(earthGraphic);
+  const map = new Map({ layers: [layer] });
+  map.ground.opacity = 0;
+  map.ground.navigationConstraint = { type: "none" };
+  earthView = new SceneView({
+    container: "view-earth",
+    map,
+    viewingMode: "local",
+    spatialReference: { wkid: 3857 },
+    environment: {
+      background: { type: "color", color: [11, 12, 15, 1] },
+      starsEnabled: false, atmosphereEnabled: false,
+      lighting: { type: "virtual", directShadowsEnabled: false, glow: glow() },
+    },
+  });
+  earthView.when(() => earthView.goTo({ target: earthGraphic, heading: 315, tilt: 60 }))
+    .then(() => status("Earth model loaded"))
+    .catch(e => status("Could not show the Earth model: " + e.message));
+}
+
+// ---------------------------------------------------------------- controls
+const activeView = () => ($("s-earth").checked ? earthView : pompeiiView);
+
+function applyLight() {
+  for (const v of [pompeiiView, earthView]) {
+    if (v) v.environment.lighting.glow = glow();
+  }
+  for (const g of [body, roofs, earthGraphic].filter(Boolean)) {
+    const s = g.symbol.clone();
+    s.symbolLayers.getItemAt(0).material.emissive.strength = state.emit;
+    g.symbol = s;
+  }
+}
+
+$("glow-on").addEventListener("change", e => { state.glowOn = e.target.checked; $("glow").disabled = !state.glowOn; applyLight(); });
+$("glow").addEventListener("input", e => { state.glow = +e.target.value; $("glow-out").textContent = state.glow.toFixed(2); applyLight(); });
+$("emit").addEventListener("input", e => { state.emit = +e.target.value; $("emit-out").textContent = state.emit.toFixed(1); applyLight(); });
+$("time").addEventListener("input", e => {
+  state.hour = +e.target.value;
+  const h = Math.floor(state.hour) % 24, m = Math.round((state.hour % 1) * 60);
+  $("time-out").textContent = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  pompeiiView.environment.lighting.date = dateFor(state.hour);
+});
+$("roofs").addEventListener("change", e => { roofs.visible = e.target.checked; });
+
+$("scene-choice").addEventListener("change", () => {
+  const earth = $("s-earth").checked;
+  $("view-pompeii").hidden = earth;
+  $("view-earth").hidden = !earth;
+  document.querySelectorAll("[data-for='pompeii']").forEach(el => { el.hidden = earth; });
+  if (earth && !earthView) { status("Loading Earth model…"); makeEarth(); }
+  else status(earth ? "Earth model loaded" : "Pompeii house loaded");
+});
+
+pompeiiView.whenLayerView(houseLayer)
+  .then(() => status("Pompeii house loaded"))
+  .catch(e => status("Could not show the house: " + e.message));
+</script>
+</body>
+</html>
