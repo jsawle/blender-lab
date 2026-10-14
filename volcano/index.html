@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inside a Stratovolcano (lab)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one working screen — the cutaway on the left, the build controls and notes on the right; stacks on phones. */
+:root {
+  --bg: #f1eee9; --panel: #ffffff; --fg: #221c18; --muted: #5f564f; --line: #dcd3c9;
+  --accent: #b23a12;           /* magma orange, darkened for text contrast */
+  --stage: #0f1218;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #16130f; --panel: #201b17; --fg: #efe8e1; --muted: #ab9f95; --line: #3a332e; --accent: #f08a5d; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--font-body); padding: 16px; }
+h1 { font-size: 1.35rem; margin: 0; text-wrap: balance; }
+h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 8px; }
+.wrap { max-width: 1320px; margin: 0 auto; display: grid; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; }
+header p { margin: 0; color: var(--muted); }
+.lab-tag { font-family: var(--font-data); font-size: 0.75rem; border: 1px solid var(--accent); color: var(--accent); padding: 1px 8px; border-radius: 3px; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; }
+@media (max-width: 900px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.stage { position: relative; background: var(--stage); border-radius: 6px; overflow: hidden; aspect-ratio: 16 / 10; min-height: 340px; }
+.stage canvas { display: block; width: 100%; height: 100%; }
+.labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.label { position: absolute; transform: translate(-50%, -50%); font: 500 0.74rem var(--font-data); color: #f7f1ea; background: rgba(15, 18, 24, 0.8);
+  padding: 2px 7px; border-radius: 3px; white-space: nowrap; border-left: 3px solid var(--c, #fff); }
+.label.tick { background: none; border: 0; padding: 0; color: #d7cfc7; font-size: 0.7rem; transform: translate(0, -50%); }
+.status { position: absolute; left: 12px; top: 12px; z-index: 2; font: 0.8rem var(--font-data); color: #f7f1ea; background: rgba(15,18,24,0.8); padding: 4px 8px; border-radius: 3px; }
+.views { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 6px; z-index: 2; }
+.views button { font: 0.85rem var(--font-body); color: #f7f1ea; background: rgba(38, 33, 30, 0.9); border: 1px solid #615851; border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+.views button[aria-pressed="true"] { background: #7c2a12; border-color: #c46a45; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+aside { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; min-width: 0; }
+.row { display: flex; align-items: center; gap: 10px; }
+.row button { font: 0.9rem var(--font-body); padding: 6px 12px; border-radius: 4px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; }
+.slider { display: grid; gap: 4px; margin-top: 10px; }
+.slider .top { display: flex; justify-content: space-between; gap: 8px; }
+.slider output { font-family: var(--font-data); font-variant-numeric: tabular-nums; color: var(--muted); }
+.slider input { width: 100%; accent-color: var(--accent); }
+.toggle { display: flex; align-items: center; gap: 10px; padding: 4px 2px; cursor: pointer; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+.say { margin: 10px 0 0; font-size: 0.92rem; min-height: 4.4em; }
+.parts { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 0.9rem; }
+.parts li { display: grid; grid-template-columns: 12px 1fr; gap: 8px; align-items: start; }
+.parts i { width: 12px; height: 12px; border-radius: 2px; margin-top: 5px; }
+.tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+thead th { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+td.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.note { color: var(--muted); font-size: 0.85rem; margin: 8px 0 0; }
+a { color: var(--accent); }
+.credit { position: fixed; right: 12px; bottom: 12px; z-index: 5; background: var(--panel); border: 1px solid var(--line); color: var(--muted); font-size: 0.75rem; padding: 4px 10px; border-radius: 4px; }
+footer { height: 36px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Inside a stratovolcano</h1>
+    <span class="lab-tag">LAB</span>
+    <p>A volcano like Fuego or Mount St Helens, cut in half and built one eruption at a time. Drawn to scale, down to the magma chamber.</p>
+  </header>
+
+  <div class="main">
+    <div class="stage" id="stage">
+      <canvas id="view" role="img" aria-describedby="partsList" aria-label="3D cutaway of a stratovolcano and the rock beneath it, showing the layers of lava and ash, the crater, the conduit, a side vent fed by a dike, the magma chamber deep below and a body of cooled magma. The parts are listed beside the view."></canvas>
+      <div class="labels" id="labels" aria-hidden="true"></div>
+      <div class="status" id="status" role="status" aria-live="polite">Loading the model…</div>
+      <div class="views" role="group" aria-label="Viewpoints">
+        <button type="button" data-view="whole" aria-pressed="true">Down to the magma</button>
+        <button type="button" data-view="cone" aria-pressed="false">The cone</button>
+      </div>
+    </div>
+
+    <aside>
+      <div class="panel">
+        <h2>Build the volcano</h2>
+        <div class="row">
+          <button type="button" id="play">Play the eruptions</button>
+          <button type="button" id="reset">Start again</button>
+        </div>
+        <div class="slider">
+          <div class="top"><label for="eruptions">Eruptions so far</label><output id="eruptionsOut" for="eruptions">10 of 10</output></div>
+          <input type="range" id="eruptions" min="1" max="10" step="1" value="10">
+        </div>
+        <p class="say" id="say" aria-live="polite"></p>
+      </div>
+      <div class="panel">
+        <h2>Show</h2>
+        <label class="toggle" for="t-labels"><input type="checkbox" id="t-labels" checked> Names of the parts</label>
+        <label class="toggle" for="t-glow"><input type="checkbox" id="t-glow" checked> Glowing magma</label>
+        <p class="note">Drag to turn the model, scroll or pinch to zoom.</p>
+      </div>
+      <div class="panel">
+        <h2>The parts</h2>
+        <ul class="parts" id="partsList">
+          <li><i style="background:#ff6a2a"></i><span><b>Magma chamber</b>: molten and part-molten rock, here about 4 to 13 km below sea level (measured under Mount St Helens). Shape simplified.</span></li>
+          <li><i style="background:#ff6a2a"></i><span><b>Conduit</b> (main vent): the pipe magma rises through. Drawn wider than real so you can see it.</span></li>
+          <li><i style="background:#ff6a2a"></i><span><b>Dike</b> and <b>side vent</b>: magma can break out sideways and erupt on the flank.</span></li>
+          <li><i style="background:#4b4644"></i><span><b>Layers of lava</b>: thick, sticky lava that flowed a short way and cooled.</span></li>
+          <li><i style="background:#c3ad8b"></i><span><b>Layers of ash</b> (tephra): ash and rock fragments blasted out in explosive eruptions.</span></li>
+          <li><i style="background:#b59e98"></i><span><b>Cooled magma</b>: magma that never erupted and cooled slowly underground into granite-like rock.</span></li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+
+  <div class="tables">
+    <section class="panel">
+      <h2>Where the magma comes from</h2>
+      <p style="margin:0">Stratovolcanoes grow above subduction zones. The sinking plate releases water about 100 km down, the water makes the hot mantle above it melt, and the magma rises and collects in chambers in the crust. This magma is thick and full of gas, so the eruptions are often explosive, and the volcano builds up steep layers of lava and ash.</p>
+      <p class="note">Follow the plate down under Guatemala, where Fuego stands, in <a href="https://jsawle.github.io/curriculum_artifacts/subduction-lab-test.html?place=guatemala">Subduction Zones Lab</a>.</p>
+      <p class="note">Sources: magma chamber depths from IRIS, "Multiple magma reservoirs beneath Mount St. Helens?" (Kiser et al.); where magma forms from USGS, "Magma Elevator" activity (Juan de Fuca plate, magma forming about 80–120 km down); cone shape and size loosely based on Mount St Helens before 1980. The model is representative, not a survey of one volcano.</p>
+    </section>
+    <section class="panel">
+      <h2>About and versions</h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr></thead>
+          <tbody>
+            <tr><td>Lab page</td><td class="num">0.1.0</td><td>Three.js 0.160.0 viewer with glow (bloom), eruption slider and labels</td></tr>
+            <tr><td>Stratovolcano cutaway model</td><td class="num" id="v-model">—</td><td>Blender script <code>blender/stratovolcano_cutaway.py</code>: 10 alternating lava and ash layers, conduit, magma chamber, dike, side vent, cooled magma, bedrock. True scale except the conduit; 1 unit = 1 km.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  <footer></footer>
+</div>
+
+<div class="credit">Created by Jason Sawle</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+const $ = (id) => document.getElementById(id);
+const status = (m) => { $("status").textContent = m; };
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// The same cone shape as the Blender script (km). Blender (x, y, z) is three.js (x, z, -y): the cut face is z = 0, facing +z.
+const H = 2.0, R = 6.0, P = 1.8, N = 10, SIDE_X = 3.1;
+const coneZ = (r, k) => { if (k <= 0) return 0; const f = k / N, hk = H * f ** 0.75, rk = R * f ** 0.6; return r >= rk ? 0 : hk * (1 - r / rk) ** P; };
+const summit = (k) => H * (k / N) ** 0.75;
+const mid = (r, k) => (coneZ(r, k - 1) + coneZ(r, k)) / 2;
+
+const SAY = [
+  "Eruption 1: lava pours out of a crack in the ground and cools into a low mound.",
+  "Eruption 2: an explosive eruption blasts out ash and rock, which settle over the lava.",
+  "Eruption 3: more lava. Thick, sticky lava doesn't flow far, so the cone gets steeper.",
+  "Eruption 4: another layer of ash. Layer by layer, lava then ash, the volcano grows.",
+  "Eruption 5: lava again. Each eruption adds a layer; that is what 'strato' (layered) means.",
+  "Eruption 6: ash. Between eruptions there can be hundreds of years of quiet.",
+  "Eruption 7: lava. The cone is now steep near the top and gentle at the foot.",
+  "Eruption 8: magma breaks out sideways along a crack (a dike) and builds a small side vent on the flank.",
+  "Eruption 9: lava from the summit.",
+  "Eruption 10: an explosive eruption leaves a crater at the top. Underneath, some magma never erupted and cooled into granite-like rock."
+];
+
+const stage = $("stage"), canvas = $("view");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.25;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0f1218);
+const camera = new THREE.PerspectiveCamera(32, 16 / 10, 0.05, 500);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true; controls.minDistance = 2; controls.maxDistance = 90;
+scene.add(new THREE.HemisphereLight(0xe8eef6, 0x4a3a2e, 1.0));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(-10, 18, 22); scene.add(sun);
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+// only things brighter than the threshold glow: the magma (emissive), not the sunlit ash (settings chosen from test renders)
+const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.35, 0.15, 0.9);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+const VIEWS = {
+  whole: { pos: [-15, 4, 34], target: [0, -6, 0] },
+  cone: { pos: [-3.5, 2.6, 10.5], target: [0.6, 0.5, 0] },
+};
+function go(name) {
+  const v = VIEWS[name];
+  camera.position.set(...v.pos); controls.target.set(...v.target); controls.update();
+  document.querySelectorAll("[data-view]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.view === name)));
+}
+document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => go(b.dataset.view)));
+go("whole");
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false); composer.setSize(w, h); bloom.resolution.set(w, h);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage); resize();
+
+// ---------- labels ----------
+const labelHost = $("labels");
+const LABELS = [
+  { text: "Crater", c: "#ffd7a8", at: () => [0, summit(state.k) + 0.35, 0], show: () => state.k === N },
+  { text: "Conduit (main vent)", c: "#ff6a2a", at: () => [0.15, -2.6, 0.05] },
+  { text: "Magma chamber", c: "#ff6a2a", at: () => [0, -9.5, 0.05] },
+  { text: "Dike", c: "#ff6a2a", at: () => [1.9, -0.4, 0.05], show: () => state.k >= 8 },
+  { text: "Side vent", c: "#ff6a2a", at: () => [SIDE_X + 0.2, coneZ(SIDE_X, N) + 0.55, 0], show: () => state.k >= 8 },
+  // point at the newest lava (odd) and ash (even) layer that is showing, up to layers 5 and 6
+  { text: "Layer of lava", c: "#8a817c", at: () => { let k = Math.min(state.k, 5); if (k % 2 === 0) k -= 1; return [-1.4, mid(1.4, k), 0]; }, show: () => close() },
+  { text: "Layer of ash", c: "#e3cfa9", at: () => { let k = Math.min(state.k, 6); if (k % 2) k -= 1; return [-2.4, mid(2.4, k), 0]; }, show: () => state.k >= 2 && close() },
+  { text: "Cooled magma", c: "#d6c3bd", at: () => [-6, -7, 0.05] },
+  { text: "Bedrock (the crust)", c: "#b7aca2", at: () => [5.5, -2.2, 0] },
+];
+// the layer labels only when zoomed in: from far away the layers are too thin to label apart
+const close = () => camera.position.distanceTo(controls.target) < 20;
+const TICKS = [[-1, "sea level"], [-6, "5 km below"], [-11, "10 km below"], [-15.5, "14.5 km below"]];
+for (const l of LABELS) { l.el = document.createElement("div"); l.el.className = "label"; l.el.style.setProperty("--c", l.c); l.el.textContent = l.text; labelHost.appendChild(l.el); }
+const tickEls = TICKS.map(([y, t]) => { const el = document.createElement("div"); el.className = "label tick"; el.textContent = "— " + t; labelHost.appendChild(el); return { y, el }; });
+const v = new THREE.Vector3();
+function placeLabels() {
+  if (labelHost.hidden) return;
+  const w = stage.clientWidth, h = stage.clientHeight;
+  const put = (el, p) => { v.set(...p).project(camera); const ok = v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05; el.hidden = !ok;
+    if (ok) { el.style.left = ((v.x + 1) / 2 * w) + "px"; el.style.top = ((1 - v.y) / 2 * h) + "px"; } };
+  for (const l of LABELS) { if (l.show && !l.show()) { l.el.hidden = true; continue; } put(l.el, l.at()); }
+  for (const t of tickEls) put(t.el, [12.1, t.y, 0]);
+}
+$("t-labels").addEventListener("change", (e) => { labelHost.hidden = !e.target.checked; });
+
+// ---------- the model ----------
+const state = { k: N, playing: false };
+const parts = { layers: [], conduit: null, dike: null, side: null };
+const loader = new GLTFLoader().setDRACOLoader(new DRACOLoader().setDecoderPath("./draco/"));
+fetch("../models/manifest.json").then(r => r.json()).then(m => { $("v-model").textContent = m["stratovolcano_cutaway.draco.glb"]?.version ?? "—"; }).catch(() => {});
+const t0 = performance.now();
+loader.load("../models/stratovolcano_cutaway.draco.glb", (gltf) => {
+  gltf.scene.traverse(o => {
+    if (o.name.startsWith("Layer_")) parts.layers[parseInt(o.name.slice(6, 8), 10) - 1] = o;
+    if (o.name === "Conduit") parts.conduit = o;
+    if (o.name === "Dike") parts.dike = o;
+    if (o.name === "SideVent") parts.side = o;
+    if (o.isMesh && o.material?.emissive && o.material.emissive.getHex() !== 0) o.material.emissiveIntensity = 2.0;
+  });
+  scene.add(gltf.scene);
+  const top = parts.conduit?.userData?.top_km ?? 1.86;
+  parts.conduitBase = -5.3; parts.conduitTop = top;
+  setEruptions(N);
+  status(`Model loaded in ${Math.round(performance.now() - t0)} ms`);
+}, undefined, (err) => status("Could not load the model: " + (err?.message || err)));
+
+function setEruptions(k) {
+  state.k = k;
+  parts.layers.forEach((o, i) => { if (o) o.visible = i < k; });
+  if (parts.dike) parts.dike.visible = k >= 8;
+  if (parts.side) parts.side.visible = k >= 8;
+  if (parts.conduit) { // the conduit reaches the top of the cone so far
+    const b = parts.conduitBase, t = k === N ? parts.conduitTop : summit(k), s = (t - b) / (parts.conduitTop - b);
+    parts.conduit.scale.y = s; parts.conduit.position.y = b * (1 - s);
+  }
+  $("eruptions").value = String(k);
+  $("eruptionsOut").textContent = `${k} of ${N}`;
+  $("say").textContent = SAY[k - 1];
+}
+$("eruptions").addEventListener("input", (e) => { stop(); setEruptions(+e.target.value); });
+let timer = 0;
+function stop() { state.playing = false; clearTimeout(timer); $("play").textContent = "Play the eruptions"; }
+$("play").addEventListener("click", () => {
+  if (state.playing) { stop(); return; }
+  state.playing = true; $("play").textContent = "Pause";
+  let k = state.k >= N ? 1 : state.k + 1;
+  const step = () => { if (!state.playing) return; setEruptions(k); if (k >= N) { stop(); return; } k++; timer = setTimeout(step, reduceMotion ? 2500 : 1600); };
+  step();
+});
+$("reset").addEventListener("click", () => { stop(); setEruptions(1); });
+$("t-glow").addEventListener("change", (e) => { bloom.enabled = e.target.checked; });
+
+renderer.setAnimationLoop(() => { controls.update(); composer.render(); placeLabels(); });
+</script>
+</body>
+</html>

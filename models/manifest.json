@@ -30,5 +30,13 @@
     "depth_m": 30.75,
     "min_y_m": 3.4,
     "bytes": 24588
+  },
+  "stratovolcano_cutaway.draco.glb": {
+    "version": "0.1.0",
+    "height_m": 17.358,
+    "width_m": 24,
+    "depth_m": 8.02,
+    "min_y_m": -15.5,
+    "bytes": 172756
   }
 }
