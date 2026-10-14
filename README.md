@@ -26,7 +26,7 @@ writes them as `emissiveFactor`, and the page reads them with
 
 | Part | Version |
 | --- | --- |
-| Lab page | 0.1.1 |
+| Lab page | 0.1.2 |
 | Earth cutaway model | 0.2.0 |
 | Pompeii house model | 0.2.0 |
 
