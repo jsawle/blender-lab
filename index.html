@@ -117,7 +117,7 @@ footer { height: 36px; }
         <table>
           <thead><tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr></thead>
           <tbody id="versions">
-            <tr><td>Lab page</td><td class="num">0.1.0</td><td>ArcGIS Maps SDK for JavaScript 5.1</td></tr>
+            <tr><td>Lab page</td><td class="num">0.1.1</td><td>ArcGIS Maps SDK for JavaScript 5.1</td></tr>
             <tr><td>Earth cutaway model</td><td class="num" id="v-earth">—</td><td><code>blender/earth_cutaway.py</code></td></tr>
             <tr><td>Pompeii house model</td><td class="num" id="v-house">—</td><td><code>blender/pompeii_house.py</code></td></tr>
           </tbody>
@@ -201,18 +201,27 @@ function makeEarth() {
   const map = new Map({ layers: [layer] });
   map.ground.opacity = 0;
   map.ground.navigationConstraint = { type: "none" };
+  // Fixed camera, set at creation. (0.1.0 used goTo after load, which was aborted and left
+  // the camera pointing at nothing.) The cutaway opens to the south-east, so look north-west
+  // from 20 km out and 14 km up, tilted to aim at the centre.
+  const d = 20000, up = 14000;
   earthView = new SceneView({
     container: "view-earth",
     map,
     viewingMode: "local",
     spatialReference: { wkid: 3857 },
+    camera: {
+      position: { x: d * Math.SQRT1_2, y: -d * Math.SQRT1_2, z: up, spatialReference: { wkid: 3857 } },
+      heading: 315,
+      tilt: 90 - Math.atan2(up, d) * 180 / Math.PI,
+    },
     environment: {
       background: { type: "color", color: [11, 12, 15, 1] },
       starsEnabled: false, atmosphereEnabled: false,
       lighting: { type: "virtual", directShadowsEnabled: false, glow: glow() },
     },
   });
-  earthView.when(() => earthView.goTo({ target: earthGraphic, heading: 315, tilt: 60 }))
+  earthView.whenLayerView(layer)
     .then(() => status("Earth model loaded"))
     .catch(e => status("Could not show the Earth model: " + e.message));
 }
