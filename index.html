@@ -66,8 +66,7 @@ footer { height: 36px; }
   <div class="main">
     <div class="stage">
       <div class="status" id="status" role="status" aria-live="polite">Loading scene…</div>
-      <div class="view" id="view-pompeii" role="region" aria-label="3D scene: a Pompeian house at night, lit by oil lamps and braziers"></div>
-      <div class="view" id="view-earth" role="region" aria-label="3D scene: cutaway of the Earth with a glowing outer and inner core" hidden></div>
+      <div class="view" id="view-host"></div>
     </div>
 
     <aside>
@@ -117,7 +116,7 @@ footer { height: 36px; }
         <table>
           <thead><tr><th scope="col">Part</th><th scope="col">Version</th><th scope="col">What it is</th></tr></thead>
           <tbody id="versions">
-            <tr><td>Lab page</td><td class="num">0.1.1</td><td>ArcGIS Maps SDK for JavaScript 5.1</td></tr>
+            <tr><td>Lab page</td><td class="num">0.1.2</td><td>ArcGIS Maps SDK for JavaScript 5.1</td></tr>
             <tr><td>Earth cutaway model</td><td class="num" id="v-earth">—</td><td><code>blender/earth_cutaway.py</code></td></tr>
             <tr><td>Pompeii house model</td><td class="num" id="v-house">—</td><td><code>blender/pompeii_house.py</code></td></tr>
           </tbody>
@@ -162,24 +161,16 @@ function modelSymbol(file, height = manifest[file].height_m) {
 }
 const glow = () => (state.glowOn ? { intensity: state.glow } : null);
 
-// ---------------------------------------------------------------- Pompeii
-const POMPEII = { longitude: 14.4836, latitude: 40.7505 };   // approximate, Regio VI
-const houseLayer = new GraphicsLayer({ elevationInfo: { mode: "relative-to-ground" } });
-const at = new Point({ ...POMPEII, z: 0 });
-const body = new Graphic({ geometry: at, symbol: modelSymbol("pompeii_house_body.glb") });
-const roofs = new Graphic({ geometry: at, symbol: modelSymbol("pompeii_house_roofs.glb") });
-houseLayer.addMany([body, roofs]);
-
-const imagery = new Basemap({
-  baseLayers: [new TileLayer({ url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer" })],
-});
-const pompeiiView = new SceneView({
-  container: "view-pompeii",
-  map: new Map({ basemap: imagery, ground: "world-elevation", layers: [houseLayer] }),
-  camera: { position: { longitude: 14.48322, latitude: 40.75003, z: 75 }, heading: 30, tilt: 68 },
-  qualityProfile: "high",
-  environment: { lighting: { type: "sun", date: dateFor(state.hour), displayUTCOffset: 2, directShadowsEnabled: true, glow: glow() } },
-});
+// One scene at a time. 0.1.1 kept both views and hid the inactive one; a view in a hidden
+// (zero-size) container stops drawing and didn't recover, so Pompeii went blank on return and
+// Earth could fail as it was revealed. Now each switch destroys the old view and builds the
+// new one in a fresh container. It also means only one 3D view runs on school devices.
+const SCENES = {
+  pompeii: { label: "Pompeii house", aria: "3D scene: a Pompeian house at night, lit by oil lamps and braziers", make: makePompeii },
+  earth: { label: "Earth model", aria: "3D scene: cutaway of the Earth with a glowing outer and inner core", make: makeEarth },
+};
+let current = null;    // { view, graphics, roofs }
+let switchId = 0;      // ignores late results from a scene the user has already left
 
 function dateFor(hour) {
   // a late-October evening; Pompeii is UTC+2 in summer time
@@ -187,26 +178,44 @@ function dateFor(hour) {
   return new Date(Date.UTC(2026, 9, 24, h - 2, m));
 }
 
+// ---------------------------------------------------------------- Pompeii
+function makePompeii(container) {
+  const POMPEII = { longitude: 14.4836, latitude: 40.7505 };   // approximate, Regio VI
+  const layer = new GraphicsLayer({ elevationInfo: { mode: "relative-to-ground" } });
+  const at = new Point({ ...POMPEII, z: 0 });
+  const body = new Graphic({ geometry: at, symbol: modelSymbol("pompeii_house_body.glb") });
+  const roofs = new Graphic({ geometry: at, symbol: modelSymbol("pompeii_house_roofs.glb"), visible: $("roofs").checked });
+  layer.addMany([body, roofs]);
+  const basemap = new Basemap({
+    baseLayers: [new TileLayer({ url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer" })],
+  });
+  const view = new SceneView({
+    container,
+    map: new Map({ basemap, ground: "world-elevation", layers: [layer] }),
+    camera: { position: { longitude: 14.48322, latitude: 40.75003, z: 75 }, heading: 30, tilt: 68 },
+    qualityProfile: "high",
+    environment: { lighting: { type: "sun", date: dateFor(state.hour), displayUTCOffset: 2, directShadowsEnabled: true, glow: glow() } },
+  });
+  return { view, layer, graphics: [body, roofs], roofs };
+}
+
 // ---------------------------------------------------------------- Earth
-let earthView = null;
-let earthGraphic = null;
-function makeEarth() {
+function makeEarth(container) {
   const layer = new GraphicsLayer({ elevationInfo: { mode: "absolute-height" } });
-  earthGraphic = new Graphic({
+  const earth = new Graphic({
     geometry: new Point({ x: 0, y: 0, z: 0, spatialReference: { wkid: 3857 } }),
     // the model is 12.742 units across; shown at 1 m : 1 km, so 12,742 m across
     symbol: modelSymbol("earth_cutaway.glb", 12742),
   });
-  layer.add(earthGraphic);
+  layer.add(earth);
   const map = new Map({ layers: [layer] });
   map.ground.opacity = 0;
   map.ground.navigationConstraint = { type: "none" };
-  // Fixed camera, set at creation. (0.1.0 used goTo after load, which was aborted and left
-  // the camera pointing at nothing.) The cutaway opens to the south-east, so look north-west
-  // from 20 km out and 14 km up, tilted to aim at the centre.
+  // Fixed camera set at creation (goTo after load was aborted in 0.1.0). The cutaway opens
+  // to the south-east, so look north-west from 20 km out and 14 km up, aimed at the centre.
   const d = 20000, up = 14000;
-  earthView = new SceneView({
-    container: "view-earth",
+  const view = new SceneView({
+    container,
     map,
     viewingMode: "local",
     spatialReference: { wkid: 3857 },
@@ -221,19 +230,33 @@ function makeEarth() {
       lighting: { type: "virtual", directShadowsEnabled: false, glow: glow() },
     },
   });
-  earthView.whenLayerView(layer)
-    .then(() => status("Earth model loaded"))
-    .catch(e => status("Could not show the Earth model: " + e.message));
+  return { view, layer, graphics: [earth], roofs: null };
+}
+
+function show(name) {
+  const id = ++switchId;
+  const scene = SCENES[name];
+  if (current) { current.view.destroy(); current = null; }
+  const host = $("view-host");
+  host.replaceChildren();
+  const container = document.createElement("div");
+  container.className = "view";
+  container.setAttribute("role", "region");
+  container.setAttribute("aria-label", scene.aria);
+  host.appendChild(container);
+  document.querySelectorAll("[data-for='pompeii']").forEach(el => { el.hidden = name !== "pompeii"; });
+  status(`Loading ${scene.label.toLowerCase()}…`);
+  current = scene.make(container);
+  current.view.whenLayerView(current.layer)
+    .then(() => { if (id === switchId) status(`${scene.label} loaded`); })
+    .catch(e => { if (id === switchId) status(`Could not show the ${scene.label.toLowerCase()}: ${e.message}`); });
 }
 
 // ---------------------------------------------------------------- controls
-const activeView = () => ($("s-earth").checked ? earthView : pompeiiView);
-
 function applyLight() {
-  for (const v of [pompeiiView, earthView]) {
-    if (v) v.environment.lighting.glow = glow();
-  }
-  for (const g of [body, roofs, earthGraphic].filter(Boolean)) {
+  if (!current) return;
+  current.view.environment.lighting.glow = glow();
+  for (const g of current.graphics) {
     const s = g.symbol.clone();
     s.symbolLayers.getItemAt(0).material.emissive.strength = state.emit;
     g.symbol = s;
@@ -247,22 +270,12 @@ $("time").addEventListener("input", e => {
   state.hour = +e.target.value;
   const h = Math.floor(state.hour) % 24, m = Math.round((state.hour % 1) * 60);
   $("time-out").textContent = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-  pompeiiView.environment.lighting.date = dateFor(state.hour);
+  if (current?.view.environment.lighting.type === "sun") current.view.environment.lighting.date = dateFor(state.hour);
 });
-$("roofs").addEventListener("change", e => { roofs.visible = e.target.checked; });
+$("roofs").addEventListener("change", e => { if (current?.roofs) current.roofs.visible = e.target.checked; });
+$("scene-choice").addEventListener("change", () => show($("s-earth").checked ? "earth" : "pompeii"));
 
-$("scene-choice").addEventListener("change", () => {
-  const earth = $("s-earth").checked;
-  $("view-pompeii").hidden = earth;
-  $("view-earth").hidden = !earth;
-  document.querySelectorAll("[data-for='pompeii']").forEach(el => { el.hidden = earth; });
-  if (earth && !earthView) { status("Loading Earth model…"); makeEarth(); }
-  else status(earth ? "Earth model loaded" : "Pompeii house loaded");
-});
-
-pompeiiView.whenLayerView(houseLayer)
-  .then(() => status("Pompeii house loaded"))
-  .catch(e => status("Could not show the house: " + e.message));
+show($("s-earth").checked ? "earth" : "pompeii");
 </script>
 </body>
 </html>
