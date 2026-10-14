@@ -15,6 +15,7 @@ from pathlib import Path
 VERSIONS = {  # bump with the model's MODEL_VERSION in blender/*.py
     "earth_cutaway": "0.2.0",
     "pompeii_house": "0.2.0",
+    "stratovolcano_cutaway": "0.1.0",
 }
 
 
